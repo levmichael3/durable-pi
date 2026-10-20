@@ -13,11 +13,18 @@ export interface BackendConfig {
   envFile: string;
   dataDir: string;
   startDirs: string[];
-  provider: "openrouter" | "faux";
+  provider: "openrouter" | "litellm" | "faux";
   token: string;
 }
 
 const expand = (p: string) => (p === "~" ? homedir() : p.startsWith("~/") ? join(homedir(), p.slice(2)) : p);
+
+/** DPI_PROVIDER: "litellm" and "faux" are explicit; anything else falls back to OpenRouter. */
+function parseProvider(value: string | undefined): "openrouter" | "litellm" | "faux" {
+  if (value === "faux") return "faux";
+  if (value === "litellm") return "litellm";
+  return "openrouter";
+}
 
 export function loadConfig(argv = process.argv.slice(2), env = process.env): BackendConfig {
   const flag = (key: string, fallback: string) => {
@@ -41,7 +48,7 @@ export function loadConfig(argv = process.argv.slice(2), env = process.env): Bac
       .split(":")
       .filter(Boolean)
       .map((p) => resolve(expand(p))),
-    provider: (env.DPI_PROVIDER ?? "openrouter") === "faux" ? "faux" : "openrouter",
+    provider: parseProvider(env.DPI_PROVIDER),
     token: env.DPI_TOKEN ?? "",
   };
   if (!Number.isInteger(config.port) || config.port < 1 || config.port > 65535)

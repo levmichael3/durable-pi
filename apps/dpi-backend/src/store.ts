@@ -39,6 +39,7 @@ import { randomUUID } from "node:crypto";
 import { BACKGROUND_CONTEXT as ctx, withAbortSignal } from "@earendil-works/chord/context";
 import { createModels } from "@earendil-works/pi-ai/models";
 import { openrouterProvider } from "@earendil-works/pi-ai/providers/openrouter";
+import { litellmProvider, LITELLM_MODEL_ID, LITELLM_MODEL_NAME, LITELLM_PROVIDER_ID } from "./litellm-provider.js";
 import { curatedModels, defaultModelId } from "./model-catalog.js";
 import { fauxModels, installFaux } from "./faux.js";
 import {
@@ -90,7 +91,7 @@ export interface StoreOptions {
   dataDir: string;
   startDirs: string[];
   name: string;
-  provider: "openrouter" | "faux";
+  provider: "openrouter" | "litellm" | "faux";
 }
 
 /** Agent documents a client may read or stream, by kind. */
@@ -178,7 +179,10 @@ export class Store {
 
   private constructor(readonly options: StoreOptions) {
     if (options.provider === "faux") installFaux(this.models);
-    else {
+    else if (options.provider === "litellm") {
+      // LiteLLM exposes its own pinned model; there is no curated OpenRouter catalog to match.
+      this.models.setProvider(litellmProvider());
+    } else {
       const provider = openrouterProvider();
       const catalog = provider.getModels();
       for (const model of curatedModels)
@@ -264,7 +268,9 @@ export class Store {
   }
 
   private defaultModel() {
-    return this.options.provider === "faux" ? fauxModels[0].id : defaultModelId;
+    if (this.options.provider === "faux") return fauxModels[0].id;
+    if (this.options.provider === "litellm") return LITELLM_MODEL_ID;
+    return defaultModelId;
   }
 
   private async loadModels(): Promise<ModelInfo[]> {
@@ -279,6 +285,19 @@ export class Store {
         reasoning: false,
         cost: { input: 0, output: 0 },
       }));
+    if (this.options.provider === "litellm") {
+      const available = await this.models.getAvailable(LITELLM_PROVIDER_ID, { signal: AbortSignal.timeout(10000) });
+      return available.map((m) => ({
+        id: m.id,
+        provider: LITELLM_PROVIDER_ID,
+        name: LITELLM_MODEL_NAME,
+        tier: "T",
+        icon: "lab.png",
+        contextWindow: m.contextWindow,
+        reasoning: m.reasoning,
+        cost: { input: m.cost.input, output: m.cost.output },
+      }));
+    }
     const available = await this.models.getAvailable("openrouter", { signal: AbortSignal.timeout(10000) });
     return curatedModels.flatMap((c) => {
       const m = available.find((m) => m.id === c.id);
@@ -304,6 +323,7 @@ export class Store {
       const id = fauxModels.some((m) => m.id === model?.modelId) ? model!.modelId : fauxModels[0].id;
       return { provider: "faux", modelId: id };
     }
+    if (this.options.provider === "litellm") return { provider: LITELLM_PROVIDER_ID, modelId: LITELLM_MODEL_ID };
     const exact = model?.provider === "openrouter" ? model.modelId : `${model?.provider}/${model?.modelId}`;
     return {
       provider: "openrouter",
@@ -318,9 +338,13 @@ export class Store {
     const known =
       this.options.provider === "faux"
         ? m.provider === "faux" && fauxModels.some((f) => f.id === m.modelId)
-        : m.provider === "openrouter" &&
-          curatedModels.some((c) => c.id === m.modelId) &&
-          !!this.models.getModel(m.provider, m.modelId);
+        : this.options.provider === "litellm"
+          ? m.provider === LITELLM_PROVIDER_ID &&
+            m.modelId === LITELLM_MODEL_ID &&
+            !!this.models.getModel(m.provider, m.modelId)
+          : m.provider === "openrouter" &&
+            curatedModels.some((c) => c.id === m.modelId) &&
+            !!this.models.getModel(m.provider, m.modelId);
     if (!known) throw invalid(`Unknown model ${m.provider}/${m.modelId}. Choose one from GET /v1/device models`);
     return { provider: m.provider, modelId: m.modelId };
   }
