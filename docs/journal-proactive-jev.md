@@ -75,3 +75,33 @@ the second one by copying the demo, not by generalizing prematurely.
   for now; the parked laptop stays a future `kind: ssh` entry.
 - Next session: run the proactive demo take and record observations
   here.
+
+### 2026-10-20 — read anthropics/cwc-workshops (short)
+
+Workshop repo, 9 entries. Five map onto our backlog:
+
+- `ship-your-first-managed-agent` → **idea c.** On-call dashboard,
+  one agent + runbook skill → commander with one investigator thread
+  per page → memory stores (read-only team history + read-write
+  agent notebook) → postmortem PDF. Takeaways: runbook-as-skill is
+  our extensions/playbook pattern; commander/investigators is our
+  `subagent` tool; the notebook (agent-written notes with version
+  history) is something our SQLite docs don't have yet; cheap
+  investigator models (their haiku vs opus) maps to our LiteLLM
+  model choice per role.
+- `production-ready-agent` → **idea b.** Coordinator + parallel
+  research subagents, reaches Linear via MCP, graded output. Takeaway:
+  Jira/PR access is "one tool + one coordinator", same shape.
+- `agent-decomposition` → **Jev elevation method.** Decompose a
+  400-line prompt into skills + code + callable agents, with evals
+  verifying each step. That is the procedure for porting
+  ten-levels patterns: one pattern at a time, each with a check.
+- `agents-that-remember` → memory primitives (cross-session store +
+  transcript consolidation). Our compaction covers consolidation;
+  the notebook idea recurs here.
+- `rightmodel` → sweep an eval suite across models for
+  quality-per-dollar. Useful when we choose which LiteLLM model
+  serves which role.
+
+No code taken; Apache 2.0 repo, ideas only. Next: wire the demo to
+LiteLLM (see Goal items 2–3), then run the first take.
